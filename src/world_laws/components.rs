@@ -19,3 +19,9 @@ pub struct Mass(pub f32);
 
 #[derive(Component)]
 pub struct Gravity;
+
+#[derive(Component)]
+pub struct ColliderShape // should be ALWAYS convex figure, also coordinates are in local space
+{
+    pub points: Vec<Vec2>,
+}

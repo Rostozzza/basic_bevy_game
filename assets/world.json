@@ -1,0 +1,30 @@
+{
+    "world":
+    {
+        "ground":
+        [
+            {
+                "position": {
+                    "x": 0,
+                    "y": -45
+                },
+                "size": {
+                    "width": 1000,
+                    "height": 10
+                },
+                "color": "#ff0000"
+            },
+            {
+                "position": {
+                    "x": 20,
+                    "y": 0
+                },
+                "size": {
+                    "width": 10,
+                    "height": 1000
+                },
+                "color": "#ffffff"
+            }
+        ]
+    }
+}

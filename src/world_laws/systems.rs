@@ -56,24 +56,26 @@ pub fn apply_gravity(mut query: Query<(&Mass, &mut Forces), With<Gravity>>)
     }
 }
 
-pub fn collision_system(query: Query<(Entity, &ColliderShape)>, mut forces_query: Query<&mut Forces>,) // powered by Separating Axis Theorem (SAT) and Minimum Translation Vector (MTV)
+pub fn collision_system(query: Query<(Entity, &Transform, &ColliderShape)>, mut forces_query: Query<&mut Forces>,)
 {
-    for [(entity_a, collider_a),
-         (entity_b, collider_b)]
+    for [(entity_a, transform_a, collider_a),
+         (entity_b, transform_b, collider_b)]
         in query.iter_combinations()
     {
         let collide_vec = 
             measure_collision_between_shapes(
+                transform_a,
                 collider_a,
+                transform_b,
                 collider_b,
             ).extend(0.0);
 
         if let Ok(mut forces_a) = forces_query.get_mut(entity_a) {
-            forces_a.0.push(Force(collide_vec));
+            forces_a.0.push(Force(-collide_vec));
         }
 
         if let Ok(mut forces_b) = forces_query.get_mut(entity_b) {
-            forces_b.0.push(Force(-collide_vec));
+            forces_b.0.push(Force(collide_vec));
         }
     }
 
@@ -94,22 +96,20 @@ pub fn collision_system(query: Query<(Entity, &ColliderShape)>, mut forces_query
         uniq_axises
     }
 
-    fn project_point_on_axis(point: &Vec2, axis_start: &Vec2, axis_vec: &Vec2) -> Vec2
+    fn project_point_on_axis(point: Vec2, axis: Vec2) -> Vec2
     {
-        let vec = point - axis_start;
-        let scalar_projection = (vec * axis_vec) / axis_vec.length_squared();
-        let projected_point = axis_start + scalar_projection * axis_vec;
-        projected_point
+        let normalized_axis = axis.normalize();
+        point.dot(normalized_axis).max(0.0) * normalized_axis
     }
 
-    fn project_shape_on_axis(shape: &ColliderShape, axis_start: &Vec2, axis_vec: &Vec2) -> (f32, f32)
+    fn project_shape_on_axis(shape: &ColliderShape, axis: Vec2, offset: f32) -> (f32, f32)
     {
         let mut min = f32::MAX;
         let mut max = f32::MIN;
 
         for point in &shape.points
         {
-            let projected_point = project_point_on_axis(&point, &axis_start, &axis_vec);
+            let projected_point = project_point_on_axis(*point, axis);
             let projection_length = projected_point.length();
 
             if projection_length < min
@@ -121,45 +121,29 @@ pub fn collision_system(query: Query<(Entity, &ColliderShape)>, mut forces_query
                 max = projection_length;
             }
         }
-        (min, max)
+        (min + offset, max + offset)
     }
 
-    fn measure_collision_between_shapes(shape1: &ColliderShape, shape2: &ColliderShape) -> Vec2 // TODO: make readable
+    fn measure_collision_between_shapes(transform1: &Transform, shape1: &ColliderShape, transform2: &Transform, shape2: &ColliderShape) -> Vec2
     {
-        let mut overlap: f32 = f32::MAX;
-        let mut axises1: Vec<Vec2> = Vec::new();
-        let mut axises2: Vec<Vec2> = Vec::new();
-        for axis in get_axises_from_shape(&shape1) // gets normals from shape sides 
-        {
-            let normal = Vec2::new(-axis.y, axis.x).normalize();
-            axises1.push(normal);
-        }
-        for axis in get_axises_from_shape(&shape2)
-        {
-            let normal = Vec2::new(-axis.y, axis.x).normalize();
-            axises2.push(normal);
-        }
+        let axises1 = get_axises_from_shape(shape1);
+        let axises2 = get_axises_from_shape(shape2);
 
-        let mut smallest = axises1[0];
         for axis in axises1.iter().chain(axises2.iter())
         {
-            let (min1, max1) = project_shape_on_axis(&shape1, &Vec2::ZERO, &axis);
-            let (min2, max2) = project_shape_on_axis(&shape2, &Vec2::ZERO, &axis);
+            let offset1 = project_point_on_axis(transform1.translation.truncate(), *axis).length();
+            let (min1, max1) = project_shape_on_axis(shape1, *axis, offset1);
+            
+            let offset2 = project_point_on_axis(transform2.translation.truncate(), *axis).length();
+            let (min2, max2) = project_shape_on_axis(shape2, *axis, offset2);
 
-            if max1 < min2 || max2 < min1 // check if overlap (if true - no overlap)
+            if max1 < min2 || max2 < min1
             {
-                return Vec2::ZERO;
-            }
-            else // calculate penetration depth
-            {
-                let o = (max2 - min1).min(max1 - min2); // overlap length
-                if o < overlap
-                {
-                    overlap = o;
-                    smallest = *axis;
-                }
+                let penetration_depth1 = max1 - min2;
+                let penetration_depth2 = max2 - min1;
+                return axis * penetration_depth1.min(penetration_depth2);
             }
         }
-        return smallest.normalize() * overlap;
+        Vec2::ZERO
     }
 }

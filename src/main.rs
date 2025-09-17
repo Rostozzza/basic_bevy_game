@@ -29,7 +29,7 @@ fn main() {
             acceleration_system,
             move_by_velocity_system,
             ttl_system,
-            // collision_system,
+            collision_system,
         ))
         .run();
 }
@@ -68,9 +68,9 @@ fn setup_world(mut commands: Commands)
             },
             Transform::from_translation(position.extend(0.0)),
         ));
-        println!("Spawned ground entity at position: {:?}", position);
-        println!("Ground entity size: {:?}", size);
-        println!("Ground entity color: {:?}", color);
+        // println!("Spawned ground entity at position: {:?}", position);
+        // println!("Ground entity size: {:?}", size);
+        // println!("Ground entity color: {:?}", color);
     }
 }
 
